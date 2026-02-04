@@ -324,53 +324,7 @@ class FirebaseSyncListener {
         }
     }
     
-    handleSignaturesUpdate(division, gender, signatures) {
-        console.log(`📥 Received signatures update for ${division}_${gender}:`, Object.keys(signatures).length, 'signatures');
-        
-        const key = `${division}_${gender}_spreadsheetData`;
-        const currentTime = Date.now();
-        
-        // Get local signatures
-        const localSignatures = JSON.parse(localStorage.getItem(key) || '{}');
-        let hasChanges = false;
-        
-        // Merge remote signatures into local
-        Object.entries(signatures).forEach(([name, data]) => {
-            if (name && name.trim()) {
-                const localSignature = localSignatures[name];
-                
-                // If remote has newer data or local doesn't have this signature
-                if (!localSignature || 
-                    (data.image && !localSignature.image) || 
-                    (data.keterangan && !localSignature.keterangan)) {
-                    
-                    localSignatures[name] = {
-                        ...localSignatures[name],
-                        ...data
-                    };
-                    hasChanges = true;
-                }
-            }
-        });
-        
-        if (hasChanges) {
-            console.log(`🔄 Updating signatures from Firebase`);
-            localStorage.setItem(key, JSON.stringify(localSignatures));
-            
-            // Update last sync time
-            this.lastSyncTimes[key] = currentTime;
-            
-            // If this is the current division/gender, update UI
-            const currentDivision = localStorage.getItem('currentDivision') || 'Khusus';
-            const currentGender = localStorage.getItem('currentGender') || 'Ikhwan';
-            
-            if (division === currentDivision && gender === currentGender) {
-                window.dispatchEvent(new CustomEvent('firebaseSignaturesUpdate', { 
-                    detail: { signatures: localSignatures, division, gender } 
-                }));
-            }
-        }
-    }
+    
     
     startPeriodicSync() {
         // Sync every 10 seconds
