@@ -748,7 +748,7 @@ body:not(.user-logged-in) .info-input:not(:focus),
 body:not(.user-logged-in) .name-input:not(:focus) {
     background-color: white;
     cursor: not-allowed;
-    color: #999;
+    color: var(--text);
 }
 
 /* Enable signature even when not logged in */
@@ -2368,7 +2368,7 @@ function updateNameInFirebase(oldName, newName) {
                            data-index="${actualIndex1}"
                            placeholder="Nama"
                            autocomplete="off"
-                           style="${!hasName1 ? 'color: #999;' : ''}">
+                           style="${!hasName1 ? 'color: var(--text);' : ''}">
                 </div>
             </td>
             <td rowspan="2" style="${!hasName1 && !hasName2 ? 'background-color: white;' : ''}">
@@ -2423,7 +2423,7 @@ function updateNameInFirebase(oldName, newName) {
                            data-index="${actualIndex2}"
                            placeholder="Nama"
                            autocomplete="off"
-                           style="${!hasName2 ? 'color: #999;' : ''}">
+                           style="${!hasName2 ? 'color: var(--text);' : ''}">
                 </div>
             </td>
             <td style="${!hasName2 ? 'background-color: white;' : ''}">
