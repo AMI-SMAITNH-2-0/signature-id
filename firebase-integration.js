@@ -5,20 +5,58 @@ class FirebaseIntegration {
     this.init();
   }
   
-  async init() {
-    console.log("🔧 Initializing Firebase integration...");
+  // Update the init method in FirebaseSyncListener class
+async init() {
+    console.log('🔄 Initializing Firebase Sync Listener...');
     
-    // Wait for Firebase
+    // Wait for Firebase to be ready
     await this.waitForFirebase();
     
-    // Setup event listeners
-    this.setupListeners();
+    // Start listening for changes
+    this.startListening();
     
-    // Setup UI
-    this.setupUI();
+    // Start periodic sync
+    this.startPeriodicSync();
     
-    this.ready = true;
-    console.log("✅ Firebase integration ready");
+    // AUTO-PULL DATA IMMEDIATELY
+    await this.autoPullOnStart();
+    
+    console.log('✅ Firebase Sync Listener initialized');
+  }
+  
+  async autoPullOnStart() {
+    console.log('🚀 Auto-pulling data on startup...');
+    
+    // Check if we should auto-pull (only if online and Firebase is available)
+    if (!navigator.onLine) {
+      console.log('📴 Offline - skipping auto-pull');
+      return;
+    }
+    
+    if (typeof firebase === 'undefined' || !firebase.apps.length) {
+      console.log('📴 Firebase not available - skipping auto-pull');
+      return;
+    }
+    
+    try {
+      // Get current division and gender
+      const currentDivision = localStorage.getItem('currentDivision') || 'Khusus';
+      const currentGender = localStorage.getItem('currentGender') || 'Ikhwan';
+      
+      console.log(`📥 Auto-pulling data for ${currentDivision}_${currentGender}...`);
+      
+      // Pull data immediately
+      await this.pullDivisionData(currentDivision, currentGender);
+      
+      console.log('✅ Auto-pull completed');
+      
+      // Show notification
+      showNotification('Data synchronized from cloud', 'success');
+      
+    } catch (error) {
+      console.error('❌ Auto-pull failed:', error);
+      showNotification('Auto-sync failed. Please check connection.', 'error');
+    }
   }
   
   async waitForFirebase() {
