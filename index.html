@@ -1751,7 +1751,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveAttendanceNames();
     }
     
-    function saveNameAtIndex(index, name) {
+function saveNameAtIndex(index, name) {
     loadAttendanceNames();
     
     // Get the old name before updating
@@ -1765,7 +1765,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update the name
     rowHeaderNames[index] = name;
     
-    console.log(`💾 Saving name at index ${index}: "${oldName}" -> "${name}"`);
+    console.log(`⚡ Saving name at index ${index}: "${oldName}" -> "${name}"`);
     
     // Save to localStorage
     const divisionKey = getFullDivisionKey('attendanceNames');
@@ -1774,18 +1774,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Clean up trailing empty pairs
     cleanupTrailingEmptyPairs();
     
-    console.log(`✅ Saved name for ${currentDivision}_${currentGender}:`, {
-        index,
-        name,
-        totalNames: rowHeaderNames.length,
-        allNames: rowHeaderNames
-    });
-    
-    // Force UI update IMMEDIATELY
-    forceUpdateTableRows();
+    // Update UI with new numbering
+    updateAllTableNumbers();
     
     // Update signature and keterangan for this index
     updateSignatureAndKeteranganForIndex(index, name);
+    
+    // TRIGGER IMMEDIATE SYNC
+    if (window.immediateSyncManager) {
+        window.immediateSyncManager.queueImmediateSync('names');
+    }
     
     // Trigger sync events
     window.dispatchEvent(new CustomEvent('namesUpdate'));
@@ -2552,13 +2550,27 @@ function updateNameInFirebase(oldName, newName) {
     }
     
     function saveAttendanceNames() {
-    const divisionKey = getFullDivisionKey('attendanceNames');
-    localStorage.setItem(divisionKey, JSON.stringify(rowHeaderNames));
-    console.log(`Saved names for ${currentDivision}_${currentGender}:`, rowHeaderNames.length, 'names');
+    const waktu = document.getElementById('waktu-input')?.value || "";
+    const tempat = document.getElementById('tempat-input')?.value || "";
+    const keterangan = document.getElementById('keterangan-input')?.value || "";
     
-    // Trigger auto-sync
+    const attendanceInfo = {
+        waktu,
+        tempat,
+        keterangan
+    };
+    
+    localStorage.setItem(getFullDivisionKey('attendanceInfo'), JSON.stringify(attendanceInfo));
+    console.log(`⚡ Attendance info saved for ${currentDivision}_${currentGender}:`, attendanceInfo);
+    
+    // TRIGGER IMMEDIATE SYNC
+    if (window.immediateSyncManager) {
+        window.immediateSyncManager.queueImmediateSync('info');
+    }
+    
+    // Also trigger regular sync for compatibility
     if (window.autoSyncManager) {
-        window.autoSyncManager.queueSync('names');
+        window.autoSyncManager.queueSync('info');
     }
 }
 
@@ -2589,9 +2601,14 @@ function saveReportTitles() {
     
     const reportTitles = [title1, title2, title3];
     localStorage.setItem(getFullDivisionKey('reportTitles'), JSON.stringify(reportTitles));
-    console.log(`Report titles saved for ${currentDivision}_${currentGender}:`, reportTitles);
+    console.log(`⚡ Report titles saved for ${currentDivision}_${currentGender}:`, reportTitles);
     
-    // Trigger auto-sync
+    // TRIGGER IMMEDIATE SYNC
+    if (window.immediateSyncManager) {
+        window.immediateSyncManager.queueImmediateSync('titles');
+    }
+    
+    // Also trigger regular sync for compatibility
     if (window.autoSyncManager) {
         window.autoSyncManager.queueSync('titles');
     }
@@ -2635,26 +2652,36 @@ function saveKeterangan(name, keterangan) {
         data[name] = {};
     }
     
-    // Save keterangan
+    // Save keterangan with timestamp
     data[name].keterangan = keterangan;
+    data[name]._lastKeteranganUpdate = Date.now(); // Add timestamp for immediate sync
     
     // Save back to localStorage
     localStorage.setItem(divisionKey, JSON.stringify(data));
-    console.log(`Saved keterangan for "${name}": "${keterangan}" in ${divisionKey}`);
+    console.log(`⚡ Saved keterangan for "${name}": "${keterangan}" in ${divisionKey}`);
     
-    // Trigger auto-sync
-    if (window.autoSyncManager) {
-        window.autoSyncManager.queueSync('signatures');
+    // TRIGGER IMMEDIATE SYNC
+    if (window.immediateSyncManager) {
+        window.immediateSyncManager.queueImmediateSync('keterangan');
+        
+        // Also trigger signatures sync since keterangan is part of signature data
+        setTimeout(() => {
+            window.immediateSyncManager.queueImmediateSync('signatures');
+        }, 100);
     }
     
-    // Save to Firebase if available (redundant but ensures immediate save)
+    // Trigger regular sync events
+    window.dispatchEvent(new CustomEvent('keteranganUpdated'));
+    window.dispatchEvent(new CustomEvent('storageUpdate'));
+    
+    // Also save to Firebase immediately
     if (window.dbManager && window.dbManager.isInitialized) {
         const signatureImage = data[name]?.image || '';
         
         window.dbManager.saveSignature(name, signatureImage, keterangan)
             .then(result => {
                 if (result.success) {
-                    console.log(`✅ Firebase: Saved keterangan for "${name}"`);
+                    console.log(`✅ Firebase: Saved keterangan for "${name}" immediately`);
                 }
             })
             .catch(error => {
@@ -3083,7 +3110,7 @@ try {
     return;
 }
         
-// Auto-save signature
+// Auto-save signature with immediate sync
 let saveTimeout;
 let lastSaveDataUrl = '';
 let drawTimer;
@@ -3110,15 +3137,18 @@ function autoSaveSignature() {
                     localData[name] = {};
                 }
                 localData[name].image = signatureDataUrl;
+                localData[name]._lastUpdated = Date.now(); // Add timestamp
+                
                 // Keep existing keterangan if it exists
                 if (data[name] && data[name].keterangan) {
                     localData[name].keterangan = data[name].keterangan;
                 }
+                
                 localStorage.setItem(divisionKey, JSON.stringify(localData));
                 
-                // TRIGGER AUTO-SYNC
-                if (window.autoSyncManager) {
-                    window.autoSyncManager.queueSync('signatures');
+                // TRIGGER IMMEDIATE SYNC
+                if (window.immediateSyncManager) {
+                    window.immediateSyncManager.queueImmediateSync('signatures');
                 }
                 
                 // Also save immediately to Firebase
@@ -3134,7 +3164,7 @@ function autoSaveSignature() {
                             // Show auto-save notification
                             const autoSaveNotification = document.getElementById('auto-save-notification');
                             if (autoSaveNotification) {
-                                autoSaveNotification.textContent = '✓ Saved';
+                                autoSaveNotification.textContent = '✓ Saved & Synced';
                                 autoSaveNotification.style.color = 'var(--secondary)';
                                 setTimeout(() => {
                                     autoSaveNotification.textContent = 'Auto-save: On';
@@ -3153,6 +3183,7 @@ function autoSaveSignature() {
                 
                 window.dispatchEvent(new CustomEvent('signatureSaved'));
                 window.dispatchEvent(new CustomEvent('storageUpdate'));
+                window.dispatchEvent(new CustomEvent('signaturesUpdated'));
                 
                 // Update existing signature section
                 updateExistingSignatureSection(signatureDataUrl);
@@ -3162,7 +3193,7 @@ function autoSaveSignature() {
             } catch (error) {
                 console.error('Error auto-saving signature:', error);
             }
-        }, 500); // Reduced to 500ms for faster auto-save
+        }, 300); // Reduced to 300ms for faster auto-save
     }
 }
         
@@ -3973,30 +4004,7 @@ function attachNameInputListeners(input) {
         }
     });
     
-    // Change handler (for explicit changes)
-    input.addEventListener('change', function(e) {
-        const newName = this.value.trim();
-        console.log(`📝 Name changed at index ${index}: "${rowHeaderNames[index]}" -> "${newName}"`);
-        
-        // Only save if actually changed
-        if (rowHeaderNames[index] !== newName) {
-            saveNameAtIndex(index, newName);
-            updateSignatureAndKeteranganForIndex(index, newName);
-        }
-    });
-    
-    // Blur handler (when user leaves field)
-    input.addEventListener('blur', function(e) {
-        const newName = this.value.trim();
-        
-        // Only save if actually changed
-        if (rowHeaderNames[index] !== newName) {
-            saveNameAtIndex(index, newName);
-            updateSignatureAndKeteranganForIndex(index, newName);
-        }
-    });
-    
-    // Input handler (real-time with debounce)
+    // Input handler with immediate sync
     let inputTimeout;
     input.addEventListener('input', function(e) {
         clearTimeout(inputTimeout);
@@ -4008,8 +4016,41 @@ function attachNameInputListeners(input) {
             if (rowHeaderNames[index] !== newName) {
                 saveNameAtIndex(index, newName);
                 updateSignatureAndKeteranganForIndex(index, newName);
+                
+                // Show sync feedback
+                showSyncFeedback(this, 'syncing');
+                
+                // After sync completes
+                setTimeout(() => {
+                    showSyncFeedback(this, 'synced');
+                }, 500);
             }
-        }, 500); // 500ms debounce
+        }, 300); // 300ms debounce for typing
+    });
+    
+    // Change handler (for explicit changes)
+    input.addEventListener('change', function(e) {
+        const newName = this.value.trim();
+        console.log(`📝 Name changed at index ${index}: "${rowHeaderNames[index]}" -> "${newName}"`);
+        
+        // Only save if actually changed
+        if (rowHeaderNames[index] !== newName) {
+            saveNameAtIndex(index, newName);
+            updateSignatureAndKeteranganForIndex(index, newName);
+            showSyncFeedback(this, 'synced');
+        }
+    });
+    
+    // Blur handler (when user leaves field)
+    input.addEventListener('blur', function(e) {
+        const newName = this.value.trim();
+        
+        // Only save if actually changed
+        if (rowHeaderNames[index] !== newName) {
+            saveNameAtIndex(index, newName);
+            updateSignatureAndKeteranganForIndex(index, newName);
+            showSyncFeedback(this, 'synced');
+        }
     });
     
     // Enter key handler
@@ -4021,6 +4062,7 @@ function attachNameInputListeners(input) {
             if (rowHeaderNames[index] !== newName) {
                 saveNameAtIndex(index, newName);
                 updateSignatureAndKeteranganForIndex(index, newName);
+                showSyncFeedback(this, 'synced');
             }
             
             // Move to next input
@@ -4033,12 +4075,14 @@ function attachKeteranganListeners(select) {
     const index = parseInt(select.dataset.index);
     const name = select.dataset.name;
     
+    // Change handler with immediate sync
     select.addEventListener('change', function() {
         const value = this.value;
         
         if (name && name.trim() !== '') {
             console.log(`📝 Keterangan changed for "${name}": "${value}"`);
             saveKeterangan(name, value);
+            showSyncFeedback(this, 'synced');
         }
     });
     
@@ -4048,6 +4092,7 @@ function attachKeteranganListeners(select) {
         
         if (name && name.trim() !== '') {
             saveKeterangan(name, value);
+            showSyncFeedback(this, 'synced');
         }
     });
 }
@@ -4077,152 +4122,175 @@ function moveToNextInput(currentInput) {
         }, 100);
     }
 }
+
+// ========== DIRECT INPUT LISTENERS FOR IMMEDIATE SYNC ==========
+function setupDirectInputListeners() {
+    console.log('🔗 Setting up direct input listeners for immediate sync...');
     
-    function setupInfoInputListeners() {
-    const waktuInput = document.getElementById('waktu-input');
-    const tempatInput = document.getElementById('tempat-input');
-    const keteranganInput = document.getElementById('keterangan-input');
+    // Title inputs
+    setupTitleInputImmediateSync();
     
-    const setupAutoSync = (input) => {
-        input.addEventListener('change', saveAttendanceInfo);
-        input.addEventListener('blur', saveAttendanceInfo);
-        input.addEventListener('input', () => {
-            clearTimeout(input.syncTimeout);
-            input.syncTimeout = setTimeout(saveAttendanceInfo, 1000);
-        });
-    };
+    // Info inputs
+    setupInfoInputImmediateSync();
     
-    if (waktuInput) setupAutoSync(waktuInput);
-    if (tempatInput) setupAutoSync(tempatInput);
-    if (keteranganInput) setupAutoSync(keteranganInput);
+    // Date input
+    setupDateInputImmediateSync();
+    
+    // Name inputs (handled in attachNameInputListeners)
+    // Keterangan selects (handled in attachKeteranganListeners)
 }
 
-function setupTitleInputListeners() {
-    const title1 = document.getElementById('report-title1');
-    const title2 = document.getElementById('report-title2');
-    const title3 = document.getElementById('report-title3');
+function setupTitleInputImmediateSync() {
+    const titleInputs = [
+        document.getElementById('report-title1'),
+        document.getElementById('report-title2'),
+        document.getElementById('report-title3')
+    ];
     
-    const setupAutoSync = (input) => {
-        input.addEventListener('change', saveReportTitles);
-        input.addEventListener('blur', saveReportTitles);
-        input.addEventListener('input', () => {
-            clearTimeout(input.syncTimeout);
-            input.syncTimeout = setTimeout(saveReportTitles, 1000);
+    titleInputs.forEach((input, index) => {
+        if (!input) return;
+        
+        // Remove existing listeners to avoid duplicates
+        const newInput = input.cloneNode(true);
+        input.parentNode.replaceChild(newInput, input);
+        
+        // Get the new input reference
+        const currentInput = titleInputs[index] = newInput;
+        
+        // Add input event for real-time sync
+        let inputTimeout;
+        currentInput.addEventListener('input', function() {
+            clearTimeout(inputTimeout);
+            
+            inputTimeout = setTimeout(() => {
+                saveReportTitles();
+                
+                // Show sync feedback
+                showSyncFeedback(this, 'syncing');
+                
+                // After sync completes
+                setTimeout(() => {
+                    showSyncFeedback(this, 'synced');
+                }, 500);
+            }, 300); // 300ms debounce for typing
         });
-    };
-    
-    if (title1) setupAutoSync(title1);
-    if (title2) setupAutoSync(title2);
-    if (title3) setupAutoSync(title3);
+        
+        // Add blur event for immediate sync
+        currentInput.addEventListener('blur', function() {
+            saveReportTitles();
+            showSyncFeedback(this, 'synced');
+        });
+    });
 }
 
-function setupDateInputListeners() {
+function setupInfoInputImmediateSync() {
+    const infoInputs = {
+        'waktu-input': document.getElementById('waktu-input'),
+        'tempat-input': document.getElementById('tempat-input'),
+        'keterangan-input': document.getElementById('keterangan-input')
+    };
+    
+    Object.entries(infoInputs).forEach(([id, input]) => {
+        if (!input) return;
+        
+        // Remove existing listeners
+        const newInput = input.cloneNode(true);
+        input.parentNode.replaceChild(newInput, input);
+        
+        // Get the new input reference
+        const currentInput = infoInputs[id] = newInput;
+        
+        // Add input event for real-time sync
+        let inputTimeout;
+        currentInput.addEventListener('input', function() {
+            clearTimeout(inputTimeout);
+            
+            inputTimeout = setTimeout(() => {
+                saveAttendanceInfo();
+                
+                // Show sync feedback
+                showSyncFeedback(this, 'syncing');
+                
+                // After sync completes
+                setTimeout(() => {
+                    showSyncFeedback(this, 'synced');
+                }, 500);
+            }, 300); // 300ms debounce for typing
+        });
+        
+        // Add blur event for immediate sync
+        currentInput.addEventListener('blur', function() {
+            saveAttendanceInfo();
+            showSyncFeedback(this, 'synced');
+        });
+    });
+}
+
+function setupDateInputImmediateSync() {
     const dateInput = document.querySelector('.date-input');
+    if (!dateInput) return;
     
-    if (dateInput) {
-        dateInput.addEventListener('change', () => {
-            if (dateInput.value) {
-                localStorage.setItem(getFullDivisionKey('tanggalPresensi'), dateInput.value);
-                
-                // Trigger auto-sync
-                if (window.autoSyncManager) {
-                    window.autoSyncManager.queueSync('date');
-                }
-            }
-        });
+    // Remove existing listeners
+    const newInput = dateInput.cloneNode(true);
+    dateInput.parentNode.replaceChild(newInput, dateInput);
+    
+    const currentInput = newInput;
+    
+    // Add input event for real-time sync
+    let inputTimeout;
+    currentInput.addEventListener('input', function() {
+        clearTimeout(inputTimeout);
         
-        dateInput.addEventListener('blur', () => {
-            if (dateInput.value) {
-                localStorage.setItem(getFullDivisionKey('tanggalPresensi'), dateInput.value);
+        inputTimeout = setTimeout(() => {
+            if (currentInput.value) {
+                localStorage.setItem(getFullDivisionKey('tanggalPresensi'), currentInput.value);
                 
-                // Trigger auto-sync
-                if (window.autoSyncManager) {
-                    window.autoSyncManager.queueSync('date');
+                // Trigger immediate sync
+                if (window.immediateSyncManager) {
+                    window.immediateSyncManager.queueImmediateSync('info');
                 }
+                
+                // Show sync feedback
+                showSyncFeedback(this, 'syncing');
+                
+                // After sync completes
+                setTimeout(() => {
+                    showSyncFeedback(this, 'synced');
+                }, 500);
             }
-        });
-        
-        dateInput.addEventListener('input', () => {
-            clearTimeout(dateInput.syncTimeout);
-            dateInput.syncTimeout = setTimeout(() => {
-                if (dateInput.value) {
-                    localStorage.setItem(getFullDivisionKey('tanggalPresensi'), dateInput.value);
-                    
-                    // Trigger auto-sync
-                    if (window.autoSyncManager) {
-                        window.autoSyncManager.queueSync('date');
-                    }
-                }
-            }, 1000);
-        });
+        }, 300);
+    });
+    
+    // Add blur event for immediate sync
+    currentInput.addEventListener('blur', function() {
+        if (currentInput.value) {
+            localStorage.setItem(getFullDivisionKey('tanggalPresensi'), currentInput.value);
+            
+            // Trigger immediate sync
+            if (window.immediateSyncManager) {
+                window.immediateSyncManager.queueImmediateSync('info');
+            }
+            
+            showSyncFeedback(this, 'synced');
+        }
+    });
+}
+
+// Visual feedback for sync status
+function showSyncFeedback(element, status) {
+    // Remove existing feedback
+    element.classList.remove('syncing', 'synced');
+    
+    // Add new status
+    element.classList.add(status);
+    
+    // Remove classes after animation
+    if (status === 'synced') {
+        setTimeout(() => {
+            element.classList.remove('synced');
+        }, 1000);
     }
 }
-    
-    function setupTitleInputListeners() {
-        const title1 = document.getElementById('report-title1');
-        const title2 = document.getElementById('report-title2');
-        const title3 = document.getElementById('report-title3');
-        
-        if (title1) {
-            title1.addEventListener('focus', function(e) {
-                const isLoggedIn = document.body.classList.contains('user-logged-in');
-                if (!isLoggedIn) {
-                    showNotification('Please login to edit titles', 'warning');
-                    this.blur();
-                    
-                    setTimeout(() => {
-                        showLoginModal();
-                    }, 500);
-                    
-                    e.preventDefault();
-                    return false;
-                }
-            });
-            
-            title1.addEventListener('change', saveReportTitles);
-            title1.addEventListener('blur', saveReportTitles);
-        }
-        
-        if (title2) {
-            title2.addEventListener('focus', function(e) {
-                const isLoggedIn = document.body.classList.contains('user-logged-in');
-                if (!isLoggedIn) {
-                    showNotification('Please login to edit titles', 'warning');
-                    this.blur();
-                    
-                    setTimeout(() => {
-                        showLoginModal();
-                    }, 500);
-                    
-                    e.preventDefault();
-                    return false;
-                }
-            });
-            
-            title2.addEventListener('change', saveReportTitles);
-            title2.addEventListener('blur', saveReportTitles);
-        }
-        
-        if (title3) {
-            title3.addEventListener('focus', function(e) {
-                const isLoggedIn = document.body.classList.contains('user-logged-in');
-                if (!isLoggedIn) {
-                    showNotification('Please login to edit titles', 'warning');
-                    this.blur();
-                    
-                    setTimeout(() => {
-                        showLoginModal();
-                    }, 500);
-                    
-                    e.preventDefault();
-                    return false;
-                }
-            });
-            
-            title3.addEventListener('change', saveReportTitles);
-            title3.addEventListener('blur', saveReportTitles);
-        }
-    }
     
     // Add to your existing event listeners setup
 function setupFirebaseUpdateListeners() {
