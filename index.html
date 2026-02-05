@@ -4224,7 +4224,7 @@ function setupDateInputListeners() {
         }
     }
     
-// Update the firebase update event handlers to force UI refresh
+    // Add to your existing event listeners setup
 function setupFirebaseUpdateListeners() {
     console.log('🔗 Setting up Firebase update listeners...');
     
@@ -4239,12 +4239,7 @@ function setupFirebaseUpdateListeners() {
         if (division === currentDivision && gender === currentGender) {
             console.log('🔄 Updating names from Firebase event');
             rowHeaderNames = names;
-            
-            // IMMEDIATE UI UPDATE
             forceUpdateTableRows();
-            updateAllTableNumbers();
-            
-            showNotification('Names updated from cloud', 'info');
         }
     });
     
@@ -4258,7 +4253,7 @@ function setupFirebaseUpdateListeners() {
         if (division === currentDivision && gender === currentGender) {
             console.log('🔄 Updating titles from Firebase event');
             
-            // Update title inputs IMMEDIATELY
+            // Update title inputs
             const title1 = document.getElementById('report-title1');
             const title2 = document.getElementById('report-title2');
             const title3 = document.getElementById('report-title3');
@@ -4266,8 +4261,6 @@ function setupFirebaseUpdateListeners() {
             if (title1 && titles[0] !== undefined) title1.value = titles[0];
             if (title2 && titles[1] !== undefined) title2.value = titles[1];
             if (title3 && titles[2] !== undefined) title3.value = titles[2];
-            
-            showNotification('Titles updated from cloud', 'info');
         }
     });
     
@@ -4281,7 +4274,7 @@ function setupFirebaseUpdateListeners() {
         if (division === currentDivision && gender === currentGender) {
             console.log('🔄 Updating info from Firebase event');
             
-            // Update info inputs IMMEDIATELY
+            // Update info inputs
             const waktuInput = document.getElementById('waktu-input');
             const tempatInput = document.getElementById('tempat-input');
             const keteranganInput = document.getElementById('keterangan-input');
@@ -4289,8 +4282,6 @@ function setupFirebaseUpdateListeners() {
             if (waktuInput && info.waktu !== undefined) waktuInput.value = info.waktu;
             if (tempatInput && info.tempat !== undefined) tempatInput.value = info.tempat;
             if (keteranganInput && info.keterangan !== undefined) keteranganInput.value = info.keterangan;
-            
-            showNotification('Info updated from cloud', 'info');
         }
     });
     
@@ -4304,13 +4295,11 @@ function setupFirebaseUpdateListeners() {
         if (division === currentDivision && gender === currentGender) {
             console.log('🔄 Updating date from Firebase event');
             
-            // Update date input IMMEDIATELY
+            // Update date input
             const dateInput = document.querySelector('.date-input');
             if (dateInput && date) {
                 dateInput.value = date;
             }
-            
-            showNotification('Date updated from cloud', 'info');
         }
     });
     
@@ -4323,26 +4312,7 @@ function setupFirebaseUpdateListeners() {
         
         if (division === currentDivision && gender === currentGender) {
             console.log('🔄 Updating signatures from Firebase event');
-            
-            // IMMEDIATE UI UPDATE
             loadSignaturesAndKeterangan();
-            
-            showNotification('Signatures updated from cloud', 'info');
-        }
-    });
-    
-    // New event for when all data is pulled
-    window.addEventListener('firebaseDataPulled', (event) => {
-        const { division, gender } = event.detail;
-        
-        const currentDivision = localStorage.getItem('currentDivision') || 'Khusus';
-        const currentGender = localStorage.getItem('currentGender') || 'Ikhwan';
-        
-        if (division === currentDivision && gender === currentGender) {
-            console.log('🔄 All data pulled from Firebase, refreshing UI');
-            
-            // Force complete UI refresh
-            forceUpdateAllPaperData();
         }
     });
     
@@ -4445,124 +4415,372 @@ function setupFirebaseUpdateListeners() {
     }
 
     // ========== INITIALIZATION ==========
-    async function initializePage() {
-    console.log('report.js: Initializing application');
-    
-    // Clean up any existing buttons first
-    removeAllLeftBottomButtons();
-    
-    // Migrate old data first
-    migrateOldData();
-    
-    // Setup gender selector FIRST
-    setupGenderSelector();
-    setupDivisionSelector();
-    
-    // Load division data FROM LOCALSTORAGE FIRST (immediate UI)
-    loadDivisionData();
-    
-    if (rowHeaderNames.length === 0) {
-        rowHeaderNames.push('');
-        rowHeaderNames.push('');
-        saveAttendanceNames();
-    } else {
-        cleanupTrailingEmptyPairs();
-    }
-    
-    initializeButtonPositions();
-    setupHamburgerMenu();
-    updateReportView();
-    updateActiveDropdownItem();
-    checkLoginStatus();
-    
-    // Setup auto-save for keterangan
-    setupKeteranganAutoSave();
-    
-    // Start periodic sync check
-    startPeriodicSyncCheck();
-    
-    // Setup Firebase update listeners
-    setupFirebaseUpdateListeners();
-    
-    // INITIAL SYNC FROM FIREBASE IMMEDIATELY
-    await performInitialFirebaseSync();
-    
-    setTimeout(() => {
-        initializeSwipeGestures();
-        console.log('Swipe gestures ready');
+    function initializePage() {
+        console.log('report.js: Initializing application');
         
-        // Force load signatures and keterangan after a delay
+        // Migrate old data first
+        migrateOldData();
+        
+        // Setup gender selector FIRST
+        setupGenderSelector();
+        setupDivisionSelector();
+        
+        // Load division data
+        loadDivisionData();
+        
+        if (rowHeaderNames.length === 0) {
+            rowHeaderNames.push('');
+            rowHeaderNames.push('');
+            saveAttendanceNames();
+        } else {
+            cleanupTrailingEmptyPairs();
+        }
+        
+        initializeButtonPositions();
+        setupHamburgerMenu();
+        updateReportView();
+        updateActiveDropdownItem();
+        checkLoginStatus();
+        
+        // Setup auto-save for keterangan
+        setupKeteranganAutoSave();
+        
         setTimeout(() => {
-            loadSignaturesAndKeterangan();
-        }, 1000);
-    }, 500);
+            initializeSwipeGestures();
+            console.log('Swipe gestures ready');
+            
+            // Add modal CSS animations
+            if (!document.querySelector('#modal-animations')) {
+                const style = document.createElement('style');
+                style.id = 'modal-animations';
+                style.textContent = `
+                    @keyframes fadeIn {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+                    
+                    @keyframes fadeOut {
+                        from { opacity: 1; }
+                        to { opacity: 0; }
+                    }
+                    
+                    @keyframes modalPop {
+                        from { transform: scale(0.9); opacity: 0; }
+                        to { transform: scale(1); opacity: 1; }
+                    }
+                    
+                    @keyframes modalPopOut {
+                        from { transform: scale(1); opacity: 1; }
+                        to { transform: scale(0.9); opacity: 0; }
+                    }
+                    
+                    .signature-wrapper {
+                        cursor: none;
+                    }
+                    
+                    .material-symbols-outlined {
+                        vertical-align: middle;
+                    }
+                    
+                    /* Login modal styles */
+                    .login-modal-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.5);
+                        z-index: 10000;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        animation: fadeIn 0.3s ease;
+                    }
+                    
+                    .login-modal {
+                        background: white;
+                        border-radius: 10px;
+                        padding: 30px;
+                        width: 90%;
+                        max-width: 500px;
+                        max-height: 90vh;
+                        overflow-y: auto;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                        position: relative;
+                        animation: modalPop 0.3s ease;
+                    }
+                    
+                    .login-modal.show {
+                        display: block;
+                    }
+                    
+                    .login-modal-content h3 {
+                        margin-top: 0;
+                        margin-bottom: 20px;
+                        color: var(--text);
+                        font-family: 'Poppins', sans-serif;
+                        font-weight: 600;
+                        text-align: center;
+                    }
+                    
+                    .login-modal-content .firebase-login-subtitle {
+                        text-align: center;
+                        color: var(--text-light);
+                        margin-bottom: 25px;
+                        font-size: 14px;
+                    }
+                    
+                    .login-input-group {
+                        margin-bottom: 20px;
+                    }
+                    
+                    .login-input {
+                        width: 100%;
+                        padding: 12px 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 6px;
+                        font-family: 'Poppins', sans-serif;
+                        font-size: 14px;
+                        transition: border-color 0.3s ease;
+                    }
+                    
+                    .login-input:focus {
+                        outline: none;
+                        border-color: var(--secondary);
+                    }
+                    
+                    .login-password-container {
+                        position: relative;
+                    }
+                    
+                    .show-password {
+                        position: absolute;
+                        right: 10px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        background: none;
+                        border: none;
+                        cursor: none;
+                        color: #666;
+                        padding: 5px;
+                    }
+                    
+                    .login-error {
+                        color: #ff6b6b;
+                        font-size: 13px;
+                        margin: 10px 0;
+                        padding: 8px 12px;
+                        background: #fff5f5;
+                        border-radius: 4px;
+                        display: none;
+                    }
+                    
+                    .login-button-group {
+                        display: flex;
+                        gap: 10px;
+                        margin-bottom: 20px;
+                    }
+                    
+                    .login-btn, .register-btn {
+                        flex: 1;
+                        padding: 12px;
+                        border: none;
+                        border-radius: 6px;
+                        font-family: 'Poppins', sans-serif;
+                        font-weight: 500;
+                        cursor: none;
+                        transition: all 0.3s ease;
+                    }
+                    
+                    .login-btn {
+                        background: var(--secondary);
+                        color: white;
+                    }
+                    
+                    .login-btn:active {
+                        background: var(--secondary);
+                    }
+                    
+                    .register-btn {
+                        background: #f0f0f0;
+                        color: var(--text);
+                    }
+                    
+                    .register-btn:active {
+                        background: #e0e0e0;
+                    }
+                    
+                    .continue-offline {
+                        text-align: center;
+                        margin-top: 20px;
+                        padding-top: 20px;
+                        border-top: 1px solid #eee;
+                    }
+                    
+                    .continue-btn {
+                        background: transparent;
+                        border: 1px solid #ddd;
+                        color: var(--text-light);
+                        padding: 10px 20px;
+                        border-radius: 6px;
+                        cursor: none;
+                        font-family: 'Poppins', sans-serif;
+                        transition: all 0.3s ease;
+                    }
+                    
+                    .continue-btn:active {
+                        background: #f5f5f5;
+                        border-color: #ccc;
+                    }
+                    
+                    .login-close-btn {
+                        position: absolute;
+                        top: 15px;
+                        right: 15px;
+                        background: none;
+                        border: none;
+                        font-size: 24px;
+                        cursor: none;
+                        color: #666;
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+.division-select {
+width: 100%;
+padding: 8px 12px;
+border-radius: 4px;
+background: white;
+font-family: 'Poppins', sans-serif;
+font-size: 13px;
+color: var(--text);
+cursor: none;
+outline: none;
 }
+                    }
+                    
+                    /* Login status indicator in dropdown */
+                    .dropdown-item.login-button.logged-in {
+                        background: var(--secondary);
+                        color: white;
+                    }
+                    
+                    .login-user-info {
+                        font-size: 12px;
+                        opacity: 0.8;
+                        margin-top: 3px;
+                    }
+                    
+                    /* Style for login button in dropdown */
+                    .login-button .material-symbols-outlined {
+                        vertical-align: middle;
+                        margin-right: 8px;
+                    }
+                    
+                    /* Make login button positioned at bottom */
+                    .dropdown-item.login-button {
+                        margin-top: auto;
+                        background: white;
+                    }
+                    
+                    .dropdown-item.login-button:active {
+                        background: var(--secondary);
+                        color: white;
+                    }
+                    
+                    /* Disabled input styles when not logged in */
+                    body:not(.user-logged-in) .title-input:not(:focus),
+                    body:not(.user-logged-in) .info-input:not(:focus),
+                    body:not(.user-logged-in) .name-input:not(:focus),
+                    body:not(.user-logged-in) .date-input:not(:focus) {
+                        background-color: white;
+                        cursor: not-allowed;
+                        color: var(--text);
+                    }
+                    
+                    /* Enable signature even when not logged in */
+                    .signature-wrapper {
+                        cursor: none !important;
+                    }
+                    
+                    body.user-logged-in .title-input:not(:focus),
+                    body.user-logged-in .info-input:not(:focus),
+                    body.user-logged-in .name-input:not(:focus),
+                    body.user-logged-in .date-input:not(:focus) {
+                        background-color: white;
+                        cursor: none;
+                        color: var(--text);
+                    }
+                    
+                    body.user-logged-in .date-input:not(:focus) {
+                        font-weight: bold;
+                    }
+                    
+                    body:not(.user-logged-in) .date-input:not(:focus) {
+                        font-weight: bold;
+                    }
+                    
+                    .dropdown-section {
+                        padding: 12px 16px;
+                        background: white;
+                    }
+                    
+                    .dropdown-section-label {
+                        font-size: 12px;
+                        color: var(--text-light);
+                        margin-bottom: 6px;
+                        font-weight: 500;
+                        font-family: 'Poppins', sans-serif;
+                    }
+                    
+                    .division-toggle-group {
+                        display: flex;
+                        align-items: center;
+                    }
+                    
+                    .division-select {
+                        width: 100%;
+                        padding: 8px 12px;
+                        border-radius: 4px;
+                        background: white;
+                        font-family: 'Poppins', sans-serif;
+                        font-size: 13px;
+                        color: var(--text);
+                        cursor: none;
+                        outline: none;
+                    }
+                    
+                    /* Auto-save notification styles */
+                    #auto-save-notification {
+                        transition: all 0.3s ease;
+                        font-weight: 500;
+                    }
+                    
+                    @keyframes savePulse {
+                        0% { opacity: 1; }
+                        50% { opacity: 0.7; }
+                        100% { opacity: 1; }
+                    }
+                    
+                    .saving {
+                        animation: savePulse 1s infinite;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // Force load signatures and keterangan after a delay
+            setTimeout(() => {
+                loadSignaturesAndKeterangan();
+            }, 1000);
+        }, 500);
+    }
 
     // Start initialization
     initializePage();
-    });
-
-// New function for initial Firebase sync
-async function performInitialFirebaseSync() {
-    console.log('🚀 Performing initial Firebase sync...');
-    
-    // Show loading state
-    showNotification('Syncing with cloud...', 'info');
-    
-    try {
-        // Wait for Firebase to be ready
-        await waitForFirebaseReady();
-        
-        // Initialize sync listener if not already done
-        if (!window.firebaseSyncListener) {
-            window.firebaseSyncListener = new FirebaseSyncListener();
-        }
-        
-        // Pull data immediately
-        const currentDivision = localStorage.getItem('currentDivision') || 'Khusus';
-        const currentGender = localStorage.getItem('currentGender') || 'Ikhwan';
-        
-        if (window.firebaseSyncListener.pullLatestData) {
-            await window.firebaseSyncListener.pullLatestData();
-            
-            // Force UI refresh with synced data
-            forceUpdateAllPaperData();
-            
-            showNotification('✅ Cloud sync completed!', 'success');
-        } else {
-            console.warn('Firebase sync listener not ready');
-            showNotification('Cloud sync not available', 'warning');
-        }
-        
-    } catch (error) {
-        console.error('❌ Initial sync failed:', error);
-        showNotification('⚠️ Cloud sync failed. Using local data.', 'warning');
-    }
-}
-
-// Helper function to wait for Firebase
-function waitForFirebaseReady() {
-    return new Promise((resolve) => {
-        let attempts = 0;
-        const maxAttempts = 10;
-        
-        const check = () => {
-            attempts++;
-            
-            if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-                console.log('✅ Firebase ready after', attempts, 'attempts');
-                resolve();
-            } else if (attempts >= maxAttempts) {
-                console.warn('⚠️ Firebase not ready after', maxAttempts, 'attempts');
-                resolve(); // Resolve anyway to continue
-            } else {
-                setTimeout(check, 500);
-            }
-        };
-        
-        check();
-    });
-}
+});
 
 // ========== PAPER UPDATE DEBUG FUNCTIONS ==========
 function debugPaperUpdate() {
