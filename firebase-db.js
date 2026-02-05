@@ -402,92 +402,110 @@ class FirebaseSyncListener {
     }
     
     async pullDivisionData(division, gender) {
-        if (typeof firebase === 'undefined' || !firebase.apps.length) {
-            return;
-        }
-        
-        const db = firebase.firestore();
-        
-        try {
-            // Pull names
-            const namesQuery = await db.collection('attendance_names')
-                .where('division', '==', division)
-                .where('gender', '==', gender)
-                .orderBy('updatedAt', 'desc')
-                .limit(1)
-                .get();
-            
-            if (!namesQuery.empty) {
-                const namesData = namesQuery.docs[0].data();
-                this.handleNamesUpdate(division, gender, namesData);
-            }
-            
-            // Pull titles
-            const titlesQuery = await db.collection('attendance_titles')
-                .where('division', '==', division)
-                .where('gender', '==', gender)
-                .orderBy('updatedAt', 'desc')
-                .limit(1)
-                .get();
-            
-            if (!titlesQuery.empty) {
-                const titlesData = titlesQuery.docs[0].data();
-                this.handleTitlesUpdate(division, gender, titlesData);
-            }
-            
-            // Pull info
-            const infoQuery = await db.collection('attendance_info')
-                .where('division', '==', division)
-                .where('gender', '==', gender)
-                .orderBy('updatedAt', 'desc')
-                .limit(1)
-                .get();
-            
-            if (!infoQuery.empty) {
-                const infoData = infoQuery.docs[0].data();
-                this.handleInfoUpdate(division, gender, infoData);
-            }
-            
-            // Pull date
-            const dateQuery = await db.collection('attendance_dates')
-                .where('division', '==', division)
-                .where('gender', '==', gender)
-                .orderBy('updatedAt', 'desc')
-                .limit(1)
-                .get();
-            
-            if (!dateQuery.empty) {
-                const dateData = dateQuery.docs[0].data();
-                this.handleDateUpdate(division, gender, dateData);
-            }
-            
-            // Pull signatures
-            const signaturesQuery = await db.collection('attendance_data')
-                .where('division', '==', division)
-                .where('gender', '==', gender)
-                .get();
-            
-            if (!signaturesQuery.empty) {
-                const signatures = {};
-                signaturesQuery.docs.forEach(doc => {
-                    const data = doc.data();
-                    const name = data.name;
-                    
-                    if (name) {
-                        signatures[name] = {
-                            image: data.signatureDataUrl || '',
-                            keterangan: data.keterangan || ''
-                        };
-                    }
-                });
-                
-                this.handleSignaturesUpdate(division, gender, signatures);
-            }
-            
-        } catch (error) {
-            console.error(`❌ Error pulling data for ${division}_${gender}:`, error);
-        }
+    if (typeof firebase === 'undefined' || !firebase.apps.length) {
+        return;
     }
+    
+    const db = firebase.firestore();
+    
+    try {
+        let hasUpdates = false;
+        
+        // Pull names
+        const namesQuery = await db.collection('attendance_names')
+            .where('division', '==', division)
+            .where('gender', '==', gender)
+            .orderBy('updatedAt', 'desc')
+            .limit(1)
+            .get();
+        
+        if (!namesQuery.empty) {
+            const namesData = namesQuery.docs[0].data();
+            this.handleNamesUpdate(division, gender, namesData);
+            hasUpdates = true;
+        }
+        
+        // Pull titles
+        const titlesQuery = await db.collection('attendance_titles')
+            .where('division', '==', division)
+            .where('gender', '==', gender)
+            .orderBy('updatedAt', 'desc')
+            .limit(1)
+            .get();
+        
+        if (!titlesQuery.empty) {
+            const titlesData = titlesQuery.docs[0].data();
+            this.handleTitlesUpdate(division, gender, titlesData);
+            hasUpdates = true;
+        }
+        
+        // Pull info
+        const infoQuery = await db.collection('attendance_info')
+            .where('division', '==', division)
+            .where('gender', '==', gender)
+            .orderBy('updatedAt', 'desc')
+            .limit(1)
+            .get();
+        
+        if (!infoQuery.empty) {
+            const infoData = infoQuery.docs[0].data();
+            this.handleInfoUpdate(division, gender, infoData);
+            hasUpdates = true;
+        }
+        
+        // Pull date
+        const dateQuery = await db.collection('attendance_dates')
+            .where('division', '==', division)
+            .where('gender', '==', gender)
+            .orderBy('updatedAt', 'desc')
+            .limit(1)
+            .get();
+        
+        if (!dateQuery.empty) {
+            const dateData = dateQuery.docs[0].data();
+            this.handleDateUpdate(division, gender, dateData);
+            hasUpdates = true;
+        }
+        
+        // Pull signatures
+        const signaturesQuery = await db.collection('attendance_data')
+            .where('division', '==', division)
+            .where('gender', '==', gender)
+            .get();
+        
+        if (!signaturesQuery.empty) {
+            const signatures = {};
+            signaturesQuery.docs.forEach(doc => {
+                const data = doc.data();
+                const name = data.name;
+                
+                if (name) {
+                    signatures[name] = {
+                        image: data.signatureDataUrl || '',
+                        keterangan: data.keterangan || ''
+                    };
+                }
+            });
+            
+            this.handleSignaturesUpdate(division, gender, signatures);
+            hasUpdates = true;
+        }
+        
+        // Force UI update if we got any updates
+        if (hasUpdates) {
+            // Dispatch event to update UI
+            window.dispatchEvent(new CustomEvent('firebaseDataPulled', {
+                detail: { division, gender }
+            }));
+        }
+        
+        return hasUpdates;
+        
+    } catch (error) {
+        console.error(`❌ Error pulling data for ${division}_${gender}:`, error);
+        throw error;
+    }
+}
     
     stopListening() {
         // Unsubscribe all listeners
